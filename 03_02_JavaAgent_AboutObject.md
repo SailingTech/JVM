@@ -2,7 +2,13 @@
 
 作者：马士兵 http://www.mashibing.com
 
-## 对象大小（64位机）
+## 对象的创建过程
+
+从Load class -> 创建对象
+
+![image-20200427153814342](./img/对象创建过程.png)
+
+## 对象大小（64位机）在内存中的布局
 
 ### 观察虚拟机配置
 
@@ -10,12 +16,12 @@ java -XX:+PrintCommandLineFlags -version
 
 ### 普通对象
 
-1. 对象头：markword  8
-2. ClassPointer指针：-XX:+UseCompressedClassPointers 为4字节 不开启为8字节
+1. 对象头：markword  8字节
+2. ClassPointer指针：指向class，-XX:+UseCompressedClassPointers 为4字节 不开启为8字节
 3. 实例数据
    1. 引用类型：-XX:+UseCompressedOops 为4字节 不开启为8字节 
-      Oops Ordinary Object Pointers
-4. Padding对齐，8的倍数
+      Oops Ordinary Object Pointers（网上很多错误的解释，结合+UseCompressedClassPointers来对比）
+4. Padding对齐，使其整个对象长度为8字节的倍数
 
 ### 数组对象
 
@@ -23,7 +29,15 @@ java -XX:+PrintCommandLineFlags -version
 2. ClassPointer指针同上
 3. 数组长度：4字节
 4. 数组数据
-5. 对齐 8的倍数
+5. 对齐 8字节的倍数
+
+
+
+## Agent 代理机制
+
+class从磁盘加载到jvm(内存)过程中代理拦截，可以直接改class字节码
+
+
 
 ## 实验
 
@@ -38,11 +52,13 @@ java -XX:+PrintCommandLineFlags -version
    
    public class ObjectSizeAgent {
        private static Instrumentation inst;
-   
+   		//固定方法名 参数格式
        public static void premain(String agentArgs, Instrumentation _inst) {
            inst = _inst;
        }
-   
+   		/**
+   		目的就是为了拿到instrumentation实例
+   		**/
        public static long sizeOf(Object o) {
            return inst.getObjectSize(o);
        }
@@ -109,11 +125,19 @@ java -XX:+PrintCommandLineFlags -version
 3. 32G，压缩无效，使用64位
    内存并不是越大越好（^-^）
 
+![image-20200427161318408](./img/对象头-markword.png)
+
+根据锁的状态（2bit）偏向锁（1bit）来分配其他位置
+
+年龄 4bit 所以最大15
+
 ## IdentityHashCode的问题
 
-回答白马非马的问题：
+问题：
 
-当一个对象计算过identityHashCode之后，不能进入偏向锁状态
+当一个对象计算过identityHashCode之后，不能进入偏向锁状态 
+
+对的，看上面图，偏向锁101，在设置线程ID时需要的位置 被hash code占用了
 
 https://cloud.tencent.com/developer/article/1480590
  https://cloud.tencent.com/developer/article/1484167
@@ -126,5 +150,13 @@ https://cloud.tencent.com/developer/article/1482500
 
 •https://blog.csdn.net/clover_lily/article/details/80095580
 
-1. 句柄池
-2. 直接指针
+1. 句柄池 中间多一个class pointer [访问时效率略低 ，GC时高效]
+2. 直接指针 hotspot使用这个 直接指向内存对象[访问时高效 ，GC时略低效]
+
+new 出来的对象怎么去和声明的变量关联
+
+
+
+## 对象分配过程
+
+![对象分配过程详解](./对象分配过程详解.png)

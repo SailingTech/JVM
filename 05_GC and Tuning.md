@@ -1,4 +1,4 @@
-# GC和GC Tuning
+# GC和GC Tuning（调优）
 
 作者：马士兵教育 http://mashibing.com
 
@@ -23,20 +23,70 @@
 
 #### 2.如何定位垃圾
 
-1. 引用计数（ReferenceCount）
+1. 引用计数（ReferenceCount）不能解决循环依赖，一堆垃圾没有被引用
 2. 根可达算法(RootSearching)
+
+![image-20200429104128312](./img/root-search.png)
+
+线程栈变量
+
+静态变量
+
+常量池
+
+JNI指针
+
+
 
 #### 3.常见的垃圾回收算法
 
-1. 标记清除(mark sweep) - 位置不连续 产生碎片 效率偏低（两遍扫描）
-2. 拷贝算法 (copying) - 没有碎片，浪费空间
-3. 标记压缩(mark compact) - 没有碎片，效率偏低（两遍扫描，指针需要调整）
+##### 标记清除(mark sweep) 
+
+位置不连续 产生碎片 效率偏低（两遍扫描）
+
+![image-20200429104823135](./img/mark-sweep.png)
+
+![image-20200429105056896](./img/image-20200429105056896.png)
+
+这种算法本身而言，存活对象比较多 效率高；不适合Eden
+
+
+
+##### 拷贝算法 (copying) 
+
+没有碎片，浪费空间 利用率只有一半
+
+![image-20200429105630434](./img/copying.png)
+
+适用于存活对象少的情况->适合Eden 
+
+##### 标记压缩(mark compact) 
+
+没有碎片，效率偏低（两遍扫描，指针需要调整）
+
+![image-20200429105932482](./img/mark-compact.png)
+
+移动存活对象到存储区域的头部
+
+
+
+
 
 #### 4.JVM内存分代模型（用于分代垃圾回收算法）
 
+![堆内存的逻辑分区](./img/堆内存的逻辑分区.png)
+
+
+
+![image-20200429111722748](/Users/sailing/chenchao/学习资料/马士兵/github/JVM/img/image-20200429111722748.png)
+
+
+
+
+
 1. 部分垃圾回收器使用的模型
 
-   > 除Epsilon ZGC Shenandoah之外的GC都是使用逻辑分代模型
+   > 除Epsilon ZGC Shenandoah[已经不是分代]之外的GC都是使用逻辑分代模型
    >
    > G1是逻辑分代，物理不分代
    >
@@ -65,8 +115,17 @@
    3. MajorGC = FGC
    
 6. 对象分配过程图
-   ![](对象分配过程详解.png)
-
+   
+![image-20200429111134701](./img/image-20200429111134701.png)
+   
+   ![绅士手](对象分配过程详解.png)
+   
+   ![image-20200429112952870](./img/image-20200429112952870.png)
+   
+   标量替换：普通类型替换引用类型
+   
+   TLAB eden分配给线程使用
+   
 7. 动态年龄：（不重要）
    https://www.jianshu.com/p/989d3b06a49d
 
