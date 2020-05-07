@@ -116,19 +116,30 @@ JNI指针
    
 6. 对象分配过程图
    
+
 ![image-20200429111134701](./img/image-20200429111134701.png)
-   
+
    ![绅士手](对象分配过程详解.png)
-   
+
    ![image-20200429112952870](./img/image-20200429112952870.png)
-   
+
    标量替换：普通类型替换引用类型
-   
-   TLAB eden分配给线程使用
-   
+
+栈上分配 出栈就结束了，没有了垃圾回收过程
+
+   TLAB eden分配给线程使用，只在线程内分配，没有和其他线程竞争的过程
+
+![image-20200429153331083](./img/image-20200429153331083.png)
+
 7. 动态年龄：（不重要）
    https://www.jianshu.com/p/989d3b06a49d
 
+   超过50%具体指的是啥？幸存区的目标存活率默认配置50%，实际就是：单个survior已经装不下 Eden + S0时
+   
+   有这么一个参数 -XX:TargetSurvivorRatio
+   
+   处理逻辑：累计计算每个年龄段对象大小，年龄时从小往大开始，累加到大于目标存活率时停止，从停止的那个年龄值开始向上的所有年龄段里的对象做晋升
+   
 8. 分配担保：（不重要）
    YGC期间 survivor区空间不够了 空间担保直接进入老年代
    参考：https://cloud.tencent.com/developer/article/1082730
@@ -139,27 +150,96 @@ JNI指针
 
 1. JDK诞生 Serial追随 提高效率，诞生了PS，为了配合CMS，诞生了PN，CMS是1.4版本后期引入，CMS是里程碑式的GC，它开启了并发回收的过程，但是CMS毛病较多，因此目前任何一个JDK版本默认是CMS
    并发垃圾回收是因为无法忍受STW
-2. Serial 年轻代 串行回收
-3. PS 年轻代 并行回收
-4. ParNew 年轻代 配合CMS的并行回收
-5. SerialOld 
+   
+2. Serial 年轻代 
+
+   单线程串行回收 复制算法
+
+   ![image-20200429180152868](./img/serial-gc.png)
+
+   适用于内存较小 几十兆；停顿时间可以接受；如今大内存 无法接受；
+
+3. PS （parallel scavenge）年轻代 多线程并行回收
+
+   ![image-20200429232346171](./img/ps-gc.png)
+
+4. ParNew 
+
+   可以看作是ps 升级版 年轻代回收器，和ps的不同点在于，用于配合CMS的并行回收，新生代和老年代同步执行
+
+   ![image-20200429233315436](/Users/sailing/chenchao/dev/git/sailingTech/JVM/img/image-20200429233315436.png)
+
+5. SerialOld  
+
+   单线程 标记整理压缩算法
+
+   ![image-20200429232109658](./img/serial-old-define.png)
+
 6. ParallelOld
-7. ConcurrentMarkSweep 老年代 并发的， 垃圾回收和应用程序同时运行，降低STW的时间(200ms)
+
+   并行老年代回收器
+
+   ![image-20200429232720529](./img/image-20200429232720529.png)
+
+7. ConcurrentMarkSweep  为了降低STW停顿时间而生
+
+   ![image-20200429234248548](./img/image-20200429234248548.png)
+
+   ![image-20200429234821303](/Users/sailing/chenchao/dev/git/sailingTech/JVM/img/image-20200429234821303.png)
+
+   老年代 并发的， 垃圾回收线程和应用程序同时运行，降低STW的时间(200ms)
+
+   围绕STW停顿时间这个点来看整个过程
+
+   （1）初始标记 根对象少，STW停顿时间短
+
+   （2）并发标记 没有STW 并发执行，但是会有浮动垃圾
+
+   （3）重新标记 标记浮动垃圾 且STW，但是浮动垃圾数量少 所以停顿时间也短
+
+   （4）并发清理 没有STW；问题和过程2是一样的有浮动垃圾，等待下一次GC过程才能清理
+
+   看图加深记忆
+
+   
+
+   |      | ![image-20200430000708832](/Users/sailing/chenchao/dev/git/sailingTech/JVM/img/image-20200430000708832.png) |
+   | ---- | ------------------------------------------------------------ |
+   |      | ![image-20200430001012019](/Users/sailing/chenchao/dev/git/sailingTech/JVM/img/image-20200430001012019.png) ![image-20200430001655541](/Users/sailing/chenchao/dev/git/sailingTech/JVM/img/image-20200430001655541.png) |
+   |      | ![image-20200430001433808](/Users/sailing/chenchao/dev/git/sailingTech/JVM/img/image-20200430001433808.png) |
+   |      | ![image-20200430001827343](/Users/sailing/chenchao/dev/git/sailingTech/JVM/img/image-20200430001827343.png) |
+
+   
+
+   
+
    CMS问题比较多，所以现在没有一个版本默认是CMS，只能手工指定
    CMS既然是MarkSweep，就一定会有碎片化的问题，碎片到达一定程度，CMS的老年代分配对象分配不下的时候，使用SerialOld 进行老年代回收
    想象一下：
    PS + PO -> 加内存 换垃圾回收器 -> PN + CMS + SerialOld（几个小时 - 几天的STW）
    几十个G的内存，单线程回收 -> G1 + FGC 几十个G -> 上T内存的服务器 ZGC
    算法：三色标记 + Incremental Update
+
+   ![image-20200430004424898](/Users/sailing/chenchao/dev/git/sailingTech/JVM/img/image-20200430004424898.png)
+
 8. G1(10ms)
    算法：三色标记 + SATB
+
 9. ZGC (1ms) PK C++
    算法：ColoredPointers + LoadBarrier
+
 10. Shenandoah
     算法：ColoredPointers + WriteBarrier
+
 11. Eplison
-12. PS 和 PN区别的延伸阅读：
+
+12. PS 和 PN区别
+
+    ![image-20200429233912603](./img/image-20200429233912603.png)
+
+    延伸阅读：
     ▪[https://docs.oracle.com/en/java/javase/13/gctuning/ergonomics.html#GUID-3D0BB91E-9BFF-4EBB-B523-14493A860E73](https://docs.oracle.com/en/java/javase/13/gctuning/ergonomics.html)
+
 13. 垃圾收集器跟内存大小的关系
     1. Serial 几十兆
     2. PS 上百兆 - 几个G
@@ -532,23 +612,35 @@ jhat -J-mx512M xxx.dump
 
 #### CMS的问题
 
-1. Memory Fragmentation
+一旦CMS没法清理老年代 serial old 得上场救援；当初设计出来时 内存1G以下
+
+1. Memory Fragmentation  内存碎片
 
    > -XX:+UseCMSCompactAtFullCollection
    > -XX:CMSFullGCsBeforeCompaction 默认为0 指的是经过多少次FGC才进行压缩
 
-2. Floating Garbage
+2. Floating Garbage 浮动垃圾
 
-   > Concurrent Mode Failure
-   > 产生：if the concurrent collector is unable to finish reclaiming the unreachable objects before the tenured generation fills up, or if an allocation cannot be satisfiedwith the available free space blocks in the tenured generation, then theapplication is paused and the collection is completed with all the applicationthreads stopped
+   full GC的两种情形，所以要极力避免 serial old来救援
+   
+   > （1）Concurrent Mode Failure
+   > 产生：if the concurrent collector is unable to finish reclaiming the unreachable objects before the tenured generation fills up, or if an allocation cannot be satisfiedwith the available free space blocks in the tenured generation, then the application is paused and the collection is completed with all the applicationthreads stopped
    >
    > 解决方案：降低触发CMS的阈值
    >
-   > PromotionFailed
+   > （2）PromotionFailed
    >
    > 解决方案类似，保持老年代有足够的空间
    >
    > –XX:CMSInitiatingOccupancyFraction 92% 可以降低这个值，让CMS保持老年代足够的空间
+   
+   问题：使用CMS没法清理老年代时，由serial old 来接管，这个时候是产生Full GC了么？
+   
+   如果进入Full GC，年轻代的垃圾回收是 PN来完成么？serial old还是只负责老年代的垃圾回收？
+   
+   发生FullGC 的表现是上面的两个原因么？
+   
+   这两个原因有什么差异？时机不一样？
 
 #### CMS日志分析
 
